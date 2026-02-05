@@ -112,14 +112,22 @@ export async function fetchEvergreenData(
   const token = await login(credentials);
   console.log("Evergreen login successful");
 
-  // Fetch dates sequentially to be gentler on the API
-  for (const date of dates) {
-    try {
-      const data = await fetchDate(date, token, credentials);
-      results.set(date, data);
-    } catch (error) {
-      console.error(`Failed to fetch Evergreen data for ${date}:`, error);
-      // Continue with other dates even if one fails
+  // Fetch all dates in parallel
+  const fetchResults = await Promise.all(
+    dates.map(async (date) => {
+      try {
+        const data = await fetchDate(date, token, credentials);
+        return { date, data, error: null };
+      } catch (error) {
+        console.error(`Failed to fetch Evergreen data for ${date}:`, error);
+        return { date, data: null, error };
+      }
+    })
+  );
+
+  for (const result of fetchResults) {
+    if (result.data) {
+      results.set(result.date, result.data);
     }
   }
 
