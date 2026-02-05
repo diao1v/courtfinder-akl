@@ -1,4 +1,4 @@
-import { config } from "../config";
+import { EVERGREEN_PRE_AUTH_TOKEN } from "../config";
 import { evergreenHeaders, fetchWithRetry } from "./http-client";
 import type {
   EvergreenLoginResponse,
@@ -9,25 +9,29 @@ import type {
 
 const BASE_URL = "https://booking.evergreensports.co.nz/public/home/Home";
 
-// Token management
-let authToken: string | null = null;
-let tokenExpiry: Date | null = null;
+/**
+ * Evergreen credentials interface
+ */
+export interface EvergreenCredentials {
+  email: string;
+  password: string;
+}
 
 /**
  * Login to Evergreen and get auth token
  */
-async function login(): Promise<string> {
+async function login(credentials: EvergreenCredentials): Promise<string> {
   const url = `${BASE_URL}/userLogin`;
 
   const response = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       ...evergreenHeaders,
-      token: config.evergreen.preAuthToken,
+      token: EVERGREEN_PRE_AUTH_TOKEN,
     },
     body: JSON.stringify({
-      email: config.evergreen.email,
-      password: config.evergreen.password,
+      email: credentials.email,
+      password: credentials.password,
     }),
   });
 
@@ -49,39 +53,12 @@ async function login(): Promise<string> {
 }
 
 /**
- * Get a valid auth token, logging in if necessary
- */
-async function getAuthToken(): Promise<string> {
-  // If we have a token and it's not expired, use it
-  if (authToken && tokenExpiry && tokenExpiry > new Date()) {
-    return authToken;
-  }
-
-  // Otherwise, login to get a new token
-  console.log("Logging in to Evergreen...");
-  authToken = await login();
-
-  // Assume token is valid for 1 hour (we'll refresh on 401)
-  tokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
-
-  console.log("Evergreen login successful");
-  return authToken;
-}
-
-/**
- * Clear the auth token (call on 401 or auth failure)
- */
-export function clearAuthToken(): void {
-  authToken = null;
-  tokenExpiry = null;
-}
-
-/**
  * Fetch court availability for a single date from Evergreen API
  */
 async function fetchDate(
   date: string,
   token: string,
+  credentials: EvergreenCredentials,
   retryOnAuth = true
 ): Promise<EvergreenTimeSlot[]> {
   const url = `${BASE_URL}/getAllCourtList`;
@@ -98,9 +75,8 @@ async function fetchDate(
   // If we get a 401 or similar auth error, try to re-login once
   if (response.status === 401 && retryOnAuth) {
     console.log("Evergreen auth token expired, re-logging in...");
-    clearAuthToken();
-    const newToken = await getAuthToken();
-    return fetchDate(date, newToken, false);
+    const newToken = await login(credentials);
+    return fetchDate(date, newToken, credentials, false);
   }
 
   if (!response.ok) {
@@ -113,9 +89,8 @@ async function fetchDate(
     // Check if it's an auth error
     if (retryOnAuth) {
       console.log("Evergreen returned error, attempting re-login...");
-      clearAuthToken();
-      const newToken = await getAuthToken();
-      return fetchDate(date, newToken, false);
+      const newToken = await login(credentials);
+      return fetchDate(date, newToken, credentials, false);
     }
     throw new Error(`Evergreen API error: ${data.errorCode}`);
   }
@@ -127,17 +102,20 @@ async function fetchDate(
  * Fetch availability for multiple dates from Evergreen API
  */
 export async function fetchEvergreenData(
-  dates: string[]
+  dates: string[],
+  credentials: EvergreenCredentials
 ): Promise<Map<string, EvergreenTimeSlot[]>> {
   const results = new Map<string, EvergreenTimeSlot[]>();
 
   // Get auth token first
-  const token = await getAuthToken();
+  console.log("Logging in to Evergreen...");
+  const token = await login(credentials);
+  console.log("Evergreen login successful");
 
   // Fetch dates sequentially to be gentler on the API
   for (const date of dates) {
     try {
-      const data = await fetchDate(date, token);
+      const data = await fetchDate(date, token, credentials);
       results.set(date, data);
     } catch (error) {
       console.error(`Failed to fetch Evergreen data for ${date}:`, error);

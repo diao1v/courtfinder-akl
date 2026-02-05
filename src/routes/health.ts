@@ -1,22 +1,28 @@
 import { Hono } from "hono";
-import { cache } from "../services/cache";
+import * as kvCache from "../services/kv-cache";
 import type { HealthResponse } from "../types";
+import type { Env } from "../env";
 
-const health = new Hono();
+const health = new Hono<{ Bindings: Env }>();
 
-health.get("/", (c) => {
-  const providerStatus = cache.getProviderStatus();
-  const lastRefresh = cache.getLastRefresh();
-  const cacheAge = cache.getAge();
+health.get("/", async (c) => {
+  const kv = c.env.CACHE;
+
+  const providerStatus = await kvCache.getProviderStatus(kv);
+  const lastRefresh = await kvCache.getLastRefresh(kv);
+  const cacheAge = await kvCache.getCacheAge(kv);
+  const hasDataResult = await kvCache.hasData(kv);
+  const isTooOld = await kvCache.isTooOldToServe(kv, c.env);
+  const isStaleResult = await kvCache.isStale(kv, c.env);
 
   // Determine overall status
   let status: "ok" | "degraded" | "error" = "ok";
 
-  if (!cache.hasData()) {
+  if (!hasDataResult) {
     status = "error";
-  } else if (cache.isTooOldToServe()) {
+  } else if (isTooOld) {
     status = "error";
-  } else if (cache.isStale()) {
+  } else if (isStaleResult) {
     status = "degraded";
   } else if (
     providerStatus?.active.status === "error" ||

@@ -1,0 +1,37 @@
+# Cloudflare Workers configuration
+name = "courtfinder-akl"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Cron triggers: Every 15 minutes from 6am to 12am Auckland time
+# Auckland is UTC+12 (NZST) or UTC+13 (NZDT)
+# This covers both timezones with some overlap
+[triggers]
+crons = ["*/15 11-23,0-12 * * *"]
+
+# KV namespace binding
+# Create with: wrangler kv:namespace create CACHE
+# Then replace the id below with the actual namespace ID
+[[kv_namespaces]]
+binding = "CACHE"
+id = "069ea6e1333a4777a7c7467e34fe70d5"
+
+# Environment variables
+[vars]
+FETCH_DAYS_AHEAD = "7"
+TZ = "Pacific/Auckland"
+CACHE_TTL_MINUTES = "20"
+STALE_SERVE_MINUTES = "60"
+ALERT_COOLDOWN_MINUTES = "30"
+
+# Email routing binding for alerts
+# Uncomment and configure once Email Routing is set up
+[[send_email]]
+name = "EMAIL"
+destination_address = "tuicaodanad@gmail.com"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+# - API_KEY
+# - EVERGREEN_EMAIL
+# - EVERGREEN_PASSWORD

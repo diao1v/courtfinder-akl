@@ -1,23 +1,27 @@
 import { Hono } from "hono";
-import { refreshAllData } from "../services/scheduler";
-import { cache } from "../services/cache";
+import { refreshAllData } from "../services/refresh";
+import * as kvCache from "../services/kv-cache";
+import type { Env } from "../env";
 
-const refresh = new Hono();
+const refresh = new Hono<{ Bindings: Env }>();
 
 refresh.post("/", async (c) => {
   const startTime = Date.now();
 
   try {
-    await refreshAllData();
+    await refreshAllData(c.env);
     const duration = Date.now() - startTime;
+
+    const cachedData = await kvCache.getCachedData(c.env.CACHE);
+    const isStale = await kvCache.isStale(c.env.CACHE, c.env);
 
     return c.json({
       success: true,
       message: "Data refreshed successfully",
       duration_ms: duration,
       cache: {
-        generated_at: cache.get()?.generated_at,
-        is_stale: cache.isStale(),
+        generated_at: cachedData?.generated_at,
+        is_stale: isStale,
       },
     });
   } catch (error) {
