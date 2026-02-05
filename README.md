@@ -1,55 +1,186 @@
 # courtfinder-akl
 
-A Hono app built with Node.js, TypeScript, and pnpm.
+Auckland badminton court availability aggregator - deployed on Cloudflare Workers.
+
+## Architecture
+
+| Component | Technology |
+|-----------|------------|
+| **Runtime** | Cloudflare Workers |
+| **Framework** | Hono |
+| **Storage** | Cloudflare KV |
+| **Scheduling** | Cloudflare Cron Triggers |
+| **Alerts** | Cloudflare Email Routing |
 
 ## Prerequisites
 
-- Node.js v24 (or v20+)
+- Node.js v20+
 - pnpm
+- Cloudflare account with Workers enabled
 
-## Getting Started
+## Quick Start
 
-1. Install dependencies:
+### 1. Install dependencies
 ```bash
 pnpm install
 ```
 
-2. Run the development server:
+### 2. Set up KV namespace
+```bash
+# Create namespace (or use CF dashboard)
+npx wrangler kv:namespace create courtfinder-cache
+
+# Update wrangler.toml with the returned namespace ID
+```
+
+### 3. Set secrets
+```bash
+npx wrangler secret put API_KEY
+npx wrangler secret put EVERGREEN_EMAIL
+npx wrangler secret put EVERGREEN_PASSWORD
+```
+
+### 4. Local development
 ```bash
 pnpm dev
 ```
 
-3. Build for production:
+### 5. Deploy
 ```bash
-pnpm build
+pnpm deploy
 ```
 
-4. Start the production server:
-```bash
-pnpm start
+## Configuration
+
+### wrangler.toml
+
+| Setting | Description |
+|---------|-------------|
+| `name` | Worker name |
+| `compatibility_date` | Workers runtime version |
+| `crons` | Cron schedule (UTC) |
+| `[[kv_namespaces]]` | KV binding |
+| `[vars]` | Environment variables |
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FETCH_DAYS_AHEAD` | Days of availability to fetch | `7` |
+| `TZ` | Timezone for date calculations | `Pacific/Auckland` |
+| `CACHE_TTL_MINUTES` | Cache freshness threshold | `20` |
+| `STALE_SERVE_MINUTES` | Max age to serve stale data | `60` |
+| `ALERT_COOLDOWN_MINUTES` | Alert cooldown period | `30` |
+
+### Secrets (via `wrangler secret put`)
+
+| Secret | Description |
+|--------|-------------|
+| `API_KEY` | API authentication key |
+| `EVERGREEN_EMAIL` | Evergreen login email |
+| `EVERGREEN_PASSWORD` | Evergreen login password |
+| `ALERT_FROM` | Alert sender email (optional) |
+| `ALERT_TO` | Alert recipient email (optional) |
+
+## Cron Schedule
+
+The cron runs every 15 minutes from **6:00 AM to 11:59 PM Auckland time**.
+
+```toml
+crons = ["*/15 17-23,0-11 * * *"]
 ```
+
+**Why these hours?**
+- Auckland is UTC+12 (NZST) or UTC+13 (NZDT)
+- 6am Auckland = 17:00-18:00 UTC
+- 11:59pm Auckland = 10:59-11:59 UTC
+- Cloudflare cron always uses UTC
+
+## API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/` | GET | No | API info |
+| `/health` | GET | No | Health status |
+| `/venues` | GET | Yes | List venues |
+| `/availability` | POST | Yes | Query availability |
+| `/refresh` | POST | Yes | Manual data refresh |
+
+**Authentication:** Include `X-API-Key` header for protected routes.
 
 ## Project Structure
 
 ```
 .
 ├── src/
-│   └── index.ts       # Main application entry point
-├── dist/              # Build output (generated)
-├── package.json       # Project dependencies and scripts
-├── tsconfig.json      # TypeScript configuration
-└── .gitignore         # Git ignore rules
+│   ├── index.ts              # Worker entry point
+│   ├── env.ts                # Environment bindings types
+│   ├── config.ts             # Static configuration
+│   ├── types.ts              # TypeScript types
+│   ├── middleware/
+│   │   └── auth.ts           # API key authentication
+│   ├── routes/
+│   │   ├── health.ts
+│   │   ├── venues.ts
+│   │   ├── availability.ts
+│   │   └── refresh.ts
+│   ├── services/
+│   │   ├── kv-cache.ts       # KV storage wrapper
+│   │   ├── refresh.ts        # Data refresh logic
+│   │   ├── email-alerter.ts  # Email alerts
+│   │   └── transformer.ts    # Data transformation
+│   └── providers/
+│       ├── active.ts         # Active.com.au API
+│       ├── evergreen.ts      # Evergreen Sports API
+│       └── http-client.ts    # HTTP client with retry
+├── wrangler.toml             # Cloudflare Workers config
+├── package.json
+└── tsconfig.json
 ```
 
 ## Available Scripts
 
-- `pnpm dev` - Start development server with hot reload
-- `pnpm build` - Build the project for production
-- `pnpm start` - Start the production server
+| Script | Command | Description |
+|--------|---------|-------------|
+| `pnpm dev` | `wrangler dev` | Local development |
+| `pnpm deploy` | `wrangler deploy` | Deploy to production |
+| `pnpm tail` | `wrangler tail` | Stream live logs |
+
+## Making Changes
+
+### Update cron schedule
+1. Edit `crons` in `wrangler.toml`
+2. Run `pnpm deploy`
+
+### Update environment variables
+1. Edit `[vars]` in `wrangler.toml`
+2. Run `pnpm deploy`
+
+### Update secrets
+```bash
+npx wrangler secret put SECRET_NAME
+# Enter new value when prompted
+```
+
+### View KV data
+```bash
+# List keys
+npx wrangler kv:key list --namespace-id YOUR_NAMESPACE_ID
+
+# Get value
+npx wrangler kv:key get "availability" --namespace-id YOUR_NAMESPACE_ID
+```
+
+### View logs
+```bash
+npx wrangler tail
+```
 
 ## Tech Stack
 
+- [Cloudflare Workers](https://workers.cloudflare.com/) - Serverless runtime
 - [Hono](https://hono.dev/) - Lightweight web framework
+- [Cloudflare KV](https://developers.cloudflare.com/kv/) - Key-value storage
 - [TypeScript](https://www.typescriptlang.org/) - Type-safe JavaScript
-- [tsx](https://github.com/esbuild-kit/tsx) - TypeScript executor for development
-- [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
+- [Zod](https://zod.dev/) - Runtime validation
+- [pnpm](https://pnpm.io/) - Package manager
