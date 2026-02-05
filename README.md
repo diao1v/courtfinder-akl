@@ -47,7 +47,7 @@ pnpm dev
 
 ### 5. Deploy
 ```bash
-pnpm deploy
+pnpm run deploy
 ```
 
 ## Configuration
