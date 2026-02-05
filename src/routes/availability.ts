@@ -1,13 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { cache } from "../services/cache";
-import { VENUES } from "../config";
+import * as kvCache from "../services/kv-cache";
+import { VALID_VENUE_IDS, DEFAULT_TIMEZONE } from "../config";
 import type { AvailabilityResponse, ErrorResponse, VenueId } from "../types";
+import type { Env } from "../env";
 
-const availability = new Hono();
-
-// Valid venue IDs
-const VALID_VENUE_IDS = VENUES.map((v) => v.id);
+const availability = new Hono<{ Bindings: Env }>();
 
 // Request validation schema
 const availabilityRequestSchema = z.object({
@@ -28,11 +26,11 @@ const availabilityRequestSchema = z.object({
 });
 
 // Get today's date in YYYY-MM-DD format (Auckland timezone)
-function getTodayDate(): string {
+function getTodayDate(timezone: string): string {
   const now = new Date();
   // Format in Auckland timezone
   const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Auckland",
+    timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -41,6 +39,9 @@ function getTodayDate(): string {
 }
 
 availability.post("/", async (c) => {
+  const kv = c.env.CACHE;
+  const timezone = c.env.TZ || DEFAULT_TIMEZONE;
+
   // Parse request body
   let body: unknown = {};
   try {
@@ -98,7 +99,8 @@ availability.post("/", async (c) => {
   const { venues: requestedVenues, start_date } = parseResult.data;
 
   // Check if cache has data
-  if (!cache.hasData()) {
+  const hasDataResult = await kvCache.hasData(kv);
+  if (!hasDataResult) {
     return c.json<ErrorResponse>(
       {
         error: "SERVICE_UNAVAILABLE",
@@ -109,7 +111,8 @@ availability.post("/", async (c) => {
   }
 
   // Check if cache is too old to serve
-  if (cache.isTooOldToServe()) {
+  const isTooOld = await kvCache.isTooOldToServe(kv, c.env);
+  if (isTooOld) {
     return c.json<ErrorResponse>(
       {
         error: "SERVICE_UNAVAILABLE",
@@ -120,11 +123,12 @@ availability.post("/", async (c) => {
   }
 
   // Default to today if no start_date provided
-  const startDate = start_date || getTodayDate();
+  const startDate = start_date || getTodayDate(timezone);
 
   // Check if requested date is in cached range
-  if (!cache.isDateInRange(startDate)) {
-    const dateRange = cache.getDateRange();
+  const isInRange = await kvCache.isDateInRange(kv, startDate);
+  if (!isInRange) {
+    const dateRange = await kvCache.getDateRange(kv);
     return c.json<ErrorResponse>(
       {
         error: "DATE_OUT_OF_RANGE",
@@ -136,7 +140,7 @@ availability.post("/", async (c) => {
 
   // Get cached data, filtered by venues if specified
   const venueIds = requestedVenues as VenueId[] | undefined;
-  const cachedData = cache.get(venueIds);
+  const cachedData = await kvCache.getCachedData(kv, venueIds);
 
   if (!cachedData) {
     return c.json<ErrorResponse>(

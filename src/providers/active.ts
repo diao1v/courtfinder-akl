@@ -9,12 +9,6 @@ const VENUE_ID_MAP: Record<string, "active-bond" | "active-corinthian"> = {
   "2": "active-corinthian",
 };
 
-export interface ActiveProviderResult {
-  success: boolean;
-  data: Record<string, ActiveVenue> | null;
-  error?: string;
-}
-
 /**
  * Fetch availability for a single date from Active API
  */

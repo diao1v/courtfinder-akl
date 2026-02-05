@@ -1,30 +1,26 @@
 {
   "name": "courtfinder-akl",
-  "version": "1.0.0",
-  "description": "Hono app for courtfinder-akl",
-  "main": "dist/index.js",
+  "version": "2.0.0",
+  "description": "Auckland badminton court availability aggregator - Cloudflare Workers",
+  "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "cf-typegen": "wrangler types"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.28.2",
   "dependencies": {
-    "@hono/node-server": "^1.19.9",
-    "dotenv": "^17.2.3",
     "hono": "^4.11.7",
-    "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.13",
+    "mimetext": "^3.0.24",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^25.2.0",
-    "@types/node-cron": "^3.0.11",
-    "@types/nodemailer": "^7.0.9",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^3.99.0"
   }
 }

@@ -1,16 +1,15 @@
-import "dotenv/config";
 import { Hono } from "hono";
-import { serve } from "@hono/node-server";
 import { logger } from "hono/logger";
-import { config } from "./config";
+import type { Env } from "./env";
 import { apiKeyAuth } from "./middleware/auth";
 import healthRoute from "./routes/health";
 import venuesRoute from "./routes/venues";
 import availabilityRoute from "./routes/availability";
 import refreshRoute from "./routes/refresh";
-import { startScheduler, initialRefresh } from "./services/scheduler";
+import { refreshAllData } from "./services/refresh";
 
-const app = new Hono();
+// Create Hono app with typed bindings
+const app = new Hono<{ Bindings: Env }>();
 
 // Middleware
 app.use("*", logger());
@@ -19,9 +18,9 @@ app.use("*", logger());
 app.route("/health", healthRoute);
 
 // Protected routes (API key required)
-app.use("/venues", apiKeyAuth);
-app.use("/availability", apiKeyAuth);
-app.use("/refresh", apiKeyAuth);
+app.use("/venues/*", apiKeyAuth);
+app.use("/availability/*", apiKeyAuth);
+app.use("/refresh/*", apiKeyAuth);
 app.route("/venues", venuesRoute);
 app.route("/availability", availabilityRoute);
 app.route("/refresh", refreshRoute);
@@ -30,7 +29,8 @@ app.route("/refresh", refreshRoute);
 app.get("/", (c) => {
   return c.json({
     name: "courtfinder-akl",
-    version: "1.0.0",
+    version: "2.0.0",
+    runtime: "Cloudflare Workers",
     description: "Auckland badminton court availability aggregator",
     endpoints: {
       health: "GET /health",
@@ -64,32 +64,30 @@ app.onError((err, c) => {
   );
 });
 
-// Start server
-const port = config.port;
-console.log(`[Server] Starting courtfinder-akl on port ${port}...`);
-console.log(`[Server] Environment: ${config.nodeEnv}`);
-
-// Start the HTTP server
-serve({
+// Export the Worker
+export default {
+  // HTTP request handler
   fetch: app.fetch,
-  port,
-});
 
-console.log(`[Server] HTTP server listening on http://localhost:${port}`);
+  // Scheduled (cron) handler
+  async scheduled(
+    event: ScheduledEvent,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    console.log(`[Scheduler] Cron triggered at ${new Date().toISOString()}`);
+    console.log(`[Scheduler] Cron event: ${event.cron}`);
 
-// Run initial data refresh and start scheduler
-(async () => {
-  await initialRefresh();
-  startScheduler();
-})();
-
-// Handle graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("[Server] SIGTERM received, shutting down gracefully...");
-  process.exit(0);
-});
-
-process.on("SIGINT", () => {
-  console.log("[Server] SIGINT received, shutting down gracefully...");
-  process.exit(0);
-});
+    // Use waitUntil to ensure the refresh completes even if the worker times out
+    ctx.waitUntil(
+      (async () => {
+        try {
+          await refreshAllData(env);
+          console.log("[Scheduler] Refresh completed successfully");
+        } catch (error) {
+          console.error("[Scheduler] Refresh failed:", error);
+        }
+      })()
+    );
+  },
+};
