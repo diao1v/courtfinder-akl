@@ -36,26 +36,22 @@ export async function fetchActiveData(
 ): Promise<Map<string, Record<string, ActiveVenue>>> {
   const results = new Map<string, Record<string, ActiveVenue>>();
 
-  // Fetch all dates in parallel (but with some concurrency limit)
-  const CONCURRENCY = 3;
-  for (let i = 0; i < dates.length; i += CONCURRENCY) {
-    const batch = dates.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(
-      batch.map(async (date) => {
-        try {
-          const response = await fetchDate(date);
-          return { date, data: response.data, error: null };
-        } catch (error) {
-          console.error(`Failed to fetch Active data for ${date}:`, error);
-          return { date, data: null, error };
-        }
-      })
-    );
-
-    for (const result of batchResults) {
-      if (result.data) {
-        results.set(result.date, result.data);
+  // Fetch all dates in parallel
+  const fetchResults = await Promise.all(
+    dates.map(async (date) => {
+      try {
+        const response = await fetchDate(date);
+        return { date, data: response.data, error: null };
+      } catch (error) {
+        console.error(`Failed to fetch Active data for ${date}:`, error);
+        return { date, data: null, error };
       }
+    })
+  );
+
+  for (const result of fetchResults) {
+    if (result.data) {
+      results.set(result.date, result.data);
     }
   }
 

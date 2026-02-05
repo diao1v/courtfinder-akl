@@ -47,7 +47,7 @@ pnpm dev
 
 ### 5. Deploy
 ```bash
-pnpm deploy
+pnpm run deploy
 ```
 
 ## Configuration
@@ -108,6 +108,105 @@ crons = ["*/15 17-23,0-11 * * *"]
 
 **Authentication:** Include `X-API-Key` header for protected routes.
 
+### Example Requests
+
+```bash
+# Base URL (change to your deployed URL)
+BASE_URL="http://localhost:8787"
+API_KEY="your-api-key"
+
+# GET / - API info (no auth)
+curl "$BASE_URL/"
+
+# GET /health - Health status (no auth)
+curl "$BASE_URL/health"
+
+# GET /venues - List all venues
+curl -H "X-API-Key: $API_KEY" "$BASE_URL/venues"
+
+# POST /availability - Query availability (all venues, starting today)
+curl -X POST \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  "$BASE_URL/availability"
+
+# POST /availability - Query specific venues and date
+curl -X POST \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"venues": ["evergreen", "active-bond"], "start_date": "2025-01-15"}' \
+  "$BASE_URL/availability"
+
+# POST /refresh - Manually trigger data refresh
+curl -X POST \
+  -H "X-API-Key: $API_KEY" \
+  "$BASE_URL/refresh"
+```
+
+### Response Examples
+
+**GET /health**
+```json
+{
+  "status": "ok",
+  "last_refresh": "2025-01-15T10:30:00.000Z",
+  "cache_age_seconds": 120,
+  "providers": {
+    "active": { "status": "ok", "last_fetch": "2025-01-15T10:30:00.000Z" },
+    "evergreen": { "status": "ok", "last_fetch": "2025-01-15T10:30:00.000Z" }
+  }
+}
+```
+
+**GET /venues**
+```json
+{
+  "venues": [
+    { "id": "active-bond", "name": "Badminton North Harbour - Bond", "address": "..." },
+    { "id": "active-corinthian", "name": "Badminton North Harbour - Corinthian", "address": "..." },
+    { "id": "evergreen", "name": "Evergreen Sports", "address": "..." }
+  ]
+}
+```
+
+**POST /availability**
+```json
+{
+  "generated_at": "2025-01-15T10:30:00.000Z",
+  "week_start": "2025-01-15",
+  "week_end": "2025-01-21",
+  "venues": {
+    "evergreen": {
+      "name": "Evergreen Sports",
+      "address": "...",
+      "dates": {
+        "2025-01-15": {
+          "slots": {
+            "09:00": { "available": true, "available_courts": ["1", "3", "5"] },
+            "10:00": { "available": true, "only_premium": true, "available_courts": ["7"] },
+            "11:00": { "available": false }
+          },
+          "summary": { "total_slots": 18, "available_slots": 5 }
+        }
+      }
+    }
+  }
+}
+```
+
+**POST /refresh**
+```json
+{
+  "success": true,
+  "message": "Data refreshed successfully",
+  "duration_ms": 2500,
+  "cache": {
+    "generated_at": "2025-01-15T10:30:00.000Z",
+    "is_stale": false
+  }
+}
+```
+
 ## Project Structure
 
 ```
@@ -143,8 +242,8 @@ crons = ["*/15 17-23,0-11 * * *"]
 | Script | Command | Description |
 |--------|---------|-------------|
 | `pnpm dev` | `wrangler dev` | Local development |
-| `pnpm deploy` | `wrangler deploy` | Deploy to production |
-| `pnpm tail` | `wrangler tail` | Stream live logs |
+| `pnpm run deploy` | `wrangler deploy` | Deploy to production |
+| `pnpm run tail` | `wrangler tail` | Stream live logs |
 
 ## Making Changes
 
