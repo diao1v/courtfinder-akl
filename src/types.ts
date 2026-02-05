@@ -15,6 +15,7 @@ export interface Venue {
 export interface TimeSlot {
   available: boolean;
   only_premium?: boolean; // Evergreen only: true when only Court 7 is available
+  available_courts?: string[]; // List of available court names for this time slot
 }
 
 export interface DaySummary {

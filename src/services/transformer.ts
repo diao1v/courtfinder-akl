@@ -30,21 +30,28 @@ function transformActiveDayData(
   let availableCount = 0;
 
   for (const timeSlot of TIME_SLOTS) {
-    let anyAvailable = false;
+    const availableCourts: string[] = [];
 
     if (venueData?.courts) {
       // Check each court at this time slot
       for (const courtData of Object.values(venueData.courts)) {
         const slot = courtData.timetable.find((t) => t.start_time === timeSlot);
         if (slot && isActiveSlotAvailable(slot.status)) {
-          anyAvailable = true;
-          break;
+          // Extract court number from name (e.g., "Court 1" -> "1")
+          const match = courtData.court.name.match(/\d+/);
+          const courtNumber = match ? match[0] : courtData.court.name;
+          availableCourts.push(courtNumber);
         }
       }
     }
 
-    slots[timeSlot] = { available: anyAvailable };
-    if (anyAvailable) availableCount++;
+    const anyAvailable = availableCourts.length > 0;
+    const slotData: TimeSlot = { available: anyAvailable };
+    if (anyAvailable) {
+      slotData.available_courts = availableCourts.sort();
+      availableCount++;
+    }
+    slots[timeSlot] = slotData;
   }
 
   return {
@@ -77,6 +84,7 @@ function transformEvergreenDayData(
     const tsData = timeToCourtMap.get(timeSlot);
     let standardAvailable = false;
     let premiumAvailable = false;
+    const availableCourts: string[] = [];
 
     if (tsData?.childer) {
       for (const court of tsData.childer) {
@@ -85,6 +93,11 @@ function transformEvergreenDayData(
 
         const isAvailable = isEvergreenSlotAvailable(court);
         if (!isAvailable) continue;
+
+        // Extract court number from name (e.g., "🏸 1" -> "1")
+        const match = court.name.match(/\d+/);
+        const courtNumber = match ? match[0] : court.name;
+        availableCourts.push(courtNumber);
 
         if (isPremiumCourt(court)) {
           premiumAvailable = true;
@@ -100,6 +113,9 @@ function transformEvergreenDayData(
     const slot: TimeSlot = { available: anyAvailable };
     if (onlyPremium) {
       slot.only_premium = true;
+    }
+    if (anyAvailable) {
+      slot.available_courts = availableCourts.sort();
     }
 
     slots[timeSlot] = slot;
