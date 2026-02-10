@@ -20,7 +20,7 @@ id = "069ea6e1333a4777a7c7467e34fe70d5"
 
 # Environment variables
 [vars]
-FETCH_DAYS_AHEAD = "7"
+FETCH_DAYS_AHEAD = "8"
 TZ = "Pacific/Auckland"
 CACHE_TTL_MINUTES = "20"
 STALE_SERVE_MINUTES = "60"

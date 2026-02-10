@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import * as kvCache from "../services/kv-cache";
 import { VALID_VENUE_IDS, DEFAULT_TIMEZONE } from "../config";
+import { getEnvNumber } from "../env";
 import type { AvailabilityResponse, ErrorResponse, VenueId } from "../types";
 import type { Env } from "../env";
 
@@ -152,7 +153,8 @@ availability.post("/", async (c) => {
     );
   }
 
-  // Filter dates to only include start_date and the following 6 days (7 days total)
+  // Filter dates to include start_date and the following N-1 days (N days total)
+  const fetchDaysAhead = getEnvNumber(c.env, "FETCH_DAYS_AHEAD", 8);
   const filteredVenues: Record<string, typeof cachedData.venues[VenueId]> = {};
 
   for (const [venueId, venueData] of Object.entries(cachedData.venues)) {
@@ -163,8 +165,8 @@ availability.post("/", async (c) => {
     const startIndex = sortedDates.findIndex((d) => d >= startDate);
 
     if (startIndex !== -1) {
-      // Take up to 7 days starting from start_date
-      const datesToInclude = sortedDates.slice(startIndex, startIndex + 7);
+      // Take up to fetchDaysAhead days starting from start_date
+      const datesToInclude = sortedDates.slice(startIndex, startIndex + fetchDaysAhead);
       for (const date of datesToInclude) {
         if (venueData.dates[date]) {
           filteredDates[date] = venueData.dates[date];
