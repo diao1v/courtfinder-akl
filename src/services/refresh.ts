@@ -4,6 +4,8 @@ import * as alerter from "./email-alerter";
 import { mergeProviderData } from "./transformer";
 import { fetchActiveData } from "../providers/active";
 import { fetchEvergreenData, type EvergreenCredentials } from "../providers/evergreen";
+import { detectChanges } from "./change-detector";
+import { notifySlotChanges } from "./webhook";
 import type { ProviderStatus, ActiveVenue, EvergreenTimeSlot } from "../types";
 import type { Env } from "../env";
 import { getEnvNumber } from "../env";
@@ -123,6 +125,9 @@ export async function refreshAllData(env: Env): Promise<void> {
     (activeData && activeData.size > 0) ||
     (evergreenData && evergreenData.size > 0)
   ) {
+    // Get previous data for change detection
+    const previousData = await kvCache.getCachedData(env.CACHE);
+
     const mergedData = mergeProviderData(
       activeData,
       evergreenData,
@@ -130,6 +135,17 @@ export async function refreshAllData(env: Env): Promise<void> {
       activeStatus,
       evergreenStatus
     );
+
+    // Detect slots that became available
+    const changes = detectChanges(previousData, mergedData);
+
+    // Notify webhook targets about newly available slots
+    if (changes.length > 0) {
+      console.log(`[Refresh] Detected ${changes.length} newly available slots, sending webhooks`);
+      await notifySlotChanges(env, changes);
+    }
+
+    // Save new data to cache
     await kvCache.setCachedData(env.CACHE, mergedData);
     console.log(`[Refresh] Cache updated at ${mergedData.generated_at}`);
   } else {

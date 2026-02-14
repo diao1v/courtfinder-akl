@@ -21,6 +21,12 @@ export interface Env {
   // Alert email addresses (comma-separated)
   ALERT_FROM?: string;
   ALERT_TO?: string;
+
+  // Webhook targets (optional - for slot availability notifications)
+  WEBHOOK_URL_OIMYCOURT?: string;
+  WEBHOOK_SECRET_OIMYCOURT?: string;
+  WEBHOOK_URL_ISCOLLIN?: string;
+  WEBHOOK_SECRET_ISCOLLIN?: string;
 }
 
 // Helper to get number from env with default
