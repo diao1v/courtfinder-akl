@@ -26,6 +26,7 @@ TZ = "Pacific/Auckland"
 CACHE_TTL_MINUTES = "20"
 STALE_SERVE_MINUTES = "60"
 ALERT_COOLDOWN_MINUTES = "30"
+WEBHOOK_URL_OIMYCOURT = "https://oimycourt-api.tuicaodanad.workers.dev/webhooks/slot-available"
 
 # Email routing binding for alerts
 # Uncomment and configure once Email Routing is set up
