@@ -1,6 +1,7 @@
 # Cloudflare Workers configuration
 name = "courtfinder-akl"
 main = "src/index.ts"
+account_id = "48bfd2e19340a5b463fa3a4c90efe0e1"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
