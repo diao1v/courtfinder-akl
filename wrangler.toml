@@ -38,3 +38,8 @@ destination_address = "tuicaodanad@gmail.com"
 # - API_KEY
 # - EVERGREEN_EMAIL
 # - EVERGREEN_PASSWORD
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true
